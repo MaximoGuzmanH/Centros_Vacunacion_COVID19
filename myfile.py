@@ -23,31 +23,54 @@ def load_and_process_data(file_path):
         'distrito': 'Distrito'
     })
 
-    # Aplicar el filtro de coordenadas para el área de Perú
-    df_filtered = df[(df['Latitud'] >= -18) & (df['Latitud'] <= -0.1) & 
-                     (df['Longitud'] >= -81) & (df['Longitud'] <= -68)]
+    # Obtener el total de puntos inicial
+    total_puntos = len(df)
 
-    # Eliminar cualquier valor nulo en las coordenadas y renombrar columnas para st.map
-    map_data = df_filtered[['Latitud', 'Longitud']].dropna()
-    map_data = map_data.rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'})
+    # Contar los valores nulos y ceros en las columnas Latitud y Longitud
+    nulos_latitud = df['Latitud'].isnull().sum()
+    nulos_longitud = df['Longitud'].isnull().sum()
+    ceros_latitud = (df['Latitud'] == 0).sum()
+    ceros_longitud = (df['Longitud'] == 0).sum()
+
+    # Contar los puntos fuera del rango de Perú (pero que no son nulos ni cero)
+    fuera_rango_latitud = ((df['Latitud'] < -18) | (df['Latitud'] > -0.1)).sum()
+    fuera_rango_longitud = ((df['Longitud'] < -81) | (df['Longitud'] > -68)).sum()
     
-    return df_filtered, map_data
+    # Filtrar puntos válidos (en el área de Perú, sin valores 0 ni nulos)
+    df_filtered = df[(df['Latitud'] >= -18) & (df['Latitud'] <= -0.1) & 
+                     (df['Longitud'] >= -81) & (df['Longitud'] <= -68) &
+                     (df['Latitud'] != 0) & (df['Longitud'] != 0) &
+                     df['Latitud'].notnull() & df['Longitud'].notnull()]
+
+    # Obtener la cantidad final de puntos válidos
+    cantidad_puntos_validos = len(df_filtered)
+
+    return (df, df_filtered, total_puntos, nulos_latitud, nulos_longitud, 
+            ceros_latitud, ceros_longitud, fuera_rango_latitud, fuera_rango_longitud, cantidad_puntos_validos)
 
 # Definir la ruta del archivo
 file_path = 'data/TB_CENTRO_VACUNACION.csv'
 
 # Llamar a la función cacheada para cargar y procesar los datos
-df_filtered, map_data = load_and_process_data(file_path)
+(df, df_filtered, total_puntos, nulos_latitud, nulos_longitud, 
+ ceros_latitud, ceros_longitud, fuera_rango_latitud, fuera_rango_longitud, cantidad_puntos_validos) = load_and_process_data(file_path)
 
 # Título de la aplicación
 st.title('Centros de Vacunacion COVID-19')
 st.subheader("Mapa de Centros de Vacunación")
 
-# Mostrar la cantidad de puntos en el mapa
-st.write(f"Cantidad de puntos que se muestran en el mapa: {len(map_data)}")
+# Mostrar el análisis de datos
+st.write(f"Total de puntos en el DataFrame: {total_puntos}")
+st.write(f"Cantidad de puntos con valores nulos en Latitud: {nulos_latitud}")
+st.write(f"Cantidad de puntos con valores nulos en Longitud: {nulos_longitud}")
+st.write(f"Cantidad de puntos con valores 0 en Latitud: {ceros_latitud}")
+st.write(f"Cantidad de puntos con valores 0 en Longitud: {ceros_longitud}")
+st.write(f"Cantidad de puntos fuera de rango en Latitud: {fuera_rango_latitud}")
+st.write(f"Cantidad de puntos fuera de rango en Longitud: {fuera_rango_longitud}")
+st.write(f"Cantidad de puntos válidos que se muestran en el mapa: {cantidad_puntos_validos}")
 
 # Mostrar el mapa usando st.map
-st.map(map_data)
+st.map(df_filtered[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
 
 # Mostrar la tabla de datos en Streamlit con los nombres de columnas actualizados
 st.dataframe(df_filtered)
