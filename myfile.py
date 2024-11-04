@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 @st.cache_resource
 def load_and_process_data(file_path):
@@ -74,3 +75,27 @@ st.map(df_filtered[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude
 
 # Mostrar la tabla de datos en Streamlit excluyendo ciertas columnas
 st.dataframe(df_filtered.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
+
+# Gráfico de pastel para la distribución de centros por entidad administradora
+st.subheader("Distribución de Centros de Vacunación por Entidad Administradora (Top 4 + Otros)")
+
+# Calcular la cantidad de centros por entidad administradora
+entidad_counts = df_filtered['Entidad Administradora'].value_counts()
+
+# Seleccionar los top 5 y agrupar el resto como "Otros"
+top_4_entidades = entidad_counts.nlargest(4)
+otros = entidad_counts[4:].sum()
+entidad_labels = list(top_4_entidades.index) + ['Otros']
+entidad_sizes = list(top_4_entidades.values) + [otros]
+
+# Crear el gráfico de pastel
+fig, ax = plt.subplots()
+ax.pie(entidad_sizes, labels=entidad_labels, autopct='%1.1f%%', startangle=90,
+       pctdistance=0.85, labeldistance=1.1, colors=plt.cm.Paired.colors)
+
+# Asegura que el gráfico sea circular y mejora la legibilidad
+ax.axis('equal')
+plt.tight_layout()
+
+# Mostrar el gráfico en Streamlit
+st.pyplot(fig)
