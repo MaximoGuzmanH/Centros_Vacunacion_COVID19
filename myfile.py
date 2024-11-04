@@ -72,5 +72,5 @@ st.write(f"Cantidad de puntos válidos que se muestran en el mapa: {cantidad_pun
 # Mostrar el mapa usando st.map
 st.map(df_filtered[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
 
-# Mostrar la tabla de datos en Streamlit con los nombres de columnas actualizados
-st.dataframe(df_filtered)
+# Mostrar la tabla de datos en Streamlit excluyendo ciertas columnas
+st.dataframe(df_filtered.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
