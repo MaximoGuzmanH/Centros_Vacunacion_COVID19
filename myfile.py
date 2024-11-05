@@ -98,26 +98,33 @@ entidad_sizes = list(top_4_entidades.values) + [otros]
 # Crear el gráfico de pastel
 fig1 = px.pie(
     values=entidad_sizes, names=entidad_labels,
-    title='Distribución de Centros de Vacunación por Entidad Administradora (Top 4 + Otros)',
     category_orders={"Entidad Administradora": entidad_labels[:-1] + ["OTROS"]}
 )
 st.plotly_chart(fig1)
 
-# Para el gráfico de pie por top departamentos
+# Gráfico de pastel para la distribución de centros por departamento (Top 5 + Otros)
+st.subheader("Distribución de Centros de Vacunación por Departamento (Top 5 + Otros)")
+
 centros_vacunacion_porDept = df_filtered[['Departamento', 'ID Centro de Vacunacion']].copy()
 centros_vacunacion_porDept['Cantidad'] = 1
 centros_vacunacion_porDept = centros_vacunacion_porDept.groupby('Departamento', as_index=False).sum()
 top5_Dept = centros_vacunacion_porDept.nlargest(5, 'Cantidad')
-otros_dept = pd.DataFrame({'Departamento': ['OTROS'], 'Cantidad': [centros_vacunacion_porDept['Cantidad'][5:].sum()]})
-dept_data = pd.concat([top5_Dept, otros_dept])
+otros_dept_count = centros_vacunacion_porDept['Cantidad'][5:].sum()
+
+# Crear el DataFrame para el gráfico de departamento (condicionalmente agregando "OTROS" si su valor es mayor que 0)
+if otros_dept_count > 0:
+    dept_data = pd.concat([top5_Dept, pd.DataFrame({'Departamento': ['OTROS'], 'Cantidad': [otros_dept_count]})])
+else:
+    dept_data = top5_Dept
 
 # Gráfico por departamento
 fig2 = px.pie(
     dept_data, values='Cantidad', names='Departamento',
-    title='Distribución de Centros de Vacunación por Departamento (Top 5 + Otros)',
-    category_orders={"Departamento": list(top5_Dept['Departamento']) + ["OTROS"]}
+    category_orders={"Departamento": list(top5_Dept['Departamento']) + (["OTROS"] if otros_dept_count > 0 else [])}
 )
 st.plotly_chart(fig2)
+
+st.subheader("Centros de Vacunación por Provincia (Top 5 + Otras)")
 
 # Selector para detalles por provincia
 departamentos_opciones = sorted(df_filtered['Departamento'].unique())
@@ -128,13 +135,18 @@ centros_por_provincia = df_filtered[df_filtered['Departamento'] == departamento_
 provincia_counts = centros_por_provincia['Provincia'].value_counts().reset_index()
 provincia_counts.columns = ['Provincia', 'Cantidad']
 top5_Prov = provincia_counts.nlargest(5, 'Cantidad')
-otros_prov = pd.DataFrame({'Provincia': ['OTRAS'], 'Cantidad': [provincia_counts['Cantidad'][5:].sum()]})
-prov_data = pd.concat([top5_Prov, otros_prov])
+otros_prov_count = provincia_counts['Cantidad'][5:].sum()
+
+# Crear el DataFrame para el gráfico de provincia (condicionalmente agregando "OTRAS" si su valor es mayor que 0)
+if otros_prov_count > 0:
+    prov_data = pd.concat([top5_Prov, pd.DataFrame({'Provincia': ['OTRAS'], 'Cantidad': [otros_prov_count]})])
+else:
+    prov_data = top5_Prov
 
 # Gráfico por provincia
 fig3 = px.pie(
     prov_data, values='Cantidad', names='Provincia',
     title=f'Centros de Vacunación en {departamento_seleccionado} por Provincia (Top 5 + Otras)',
-    category_orders={"Provincia": list(top5_Prov['Provincia']) + ["OTRAS"]}
+    category_orders={"Provincia": list(top5_Prov['Provincia']) + (["OTRAS"] if otros_prov_count > 0 else [])}
 )
 st.plotly_chart(fig3)
