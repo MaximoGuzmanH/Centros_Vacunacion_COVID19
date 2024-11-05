@@ -4,3 +4,4 @@ altair
 folium
 matplotlib
 plotly
+streamlit-card

@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.express as px
+from streamlit_card import card
 
 @st.cache_resource
 def load_and_process_data(file_path):
@@ -61,85 +61,80 @@ file_path = 'data/TB_CENTRO_VACUNACION.csv'
 st.title('Centros de Vacunacion COVID-19')
 st.subheader("Mapa de Centros de Vacunación")
 
-# Mostrar el análisis de datos
-st.write(f"Total de puntos en el DataFrame: {total_puntos}")
-st.write(f"Cantidad de puntos con valores nulos en Latitud: {nulos_latitud}")
-st.write(f"Cantidad de puntos con valores nulos en Longitud: {nulos_longitud}")
-st.write(f"Cantidad de puntos con valores 0 en Latitud: {ceros_latitud}")
-st.write(f"Cantidad de puntos con valores 0 en Longitud: {ceros_longitud}")
-st.write(f"Cantidad de puntos fuera de rango en Latitud: {fuera_rango_latitud}")
-st.write(f"Cantidad de puntos fuera de rango en Longitud: {fuera_rango_longitud}")
-st.write(f"Cantidad de puntos válidos que se muestran en el mapa: {cantidad_puntos_validos}")
-
 # Mostrar el mapa usando st.map
 st.map(df_filtered[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
 
 # Mostrar la tabla de datos en Streamlit excluyendo ciertas columnas
 st.dataframe(df_filtered.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
 
-# Gráfico de pastel para la distribución de centros por entidad administradora (Top 4 + Otros)
+# Mostrar los datos con streamlit_card
+st.subheader("Análisis de Datos")
+
+col1, col2 = st.columns(2)
+with col1:
+    card(title=f"{total_puntos}", text="Total de puntos en el DataFrame", key="total_puntos")
+    card(title=f"{nulos_latitud}", text="Cantidad de puntos con valores nulos en Latitud", key="nulos_latitud")
+    card(title=f"{ceros_latitud}", text="Cantidad de puntos con valores 0 en Latitud", key="ceros_latitud")
+    card(title=f"{fuera_rango_latitud}", text="Cantidad de puntos fuera de rango en Latitud", key="fuera_rango_latitud")
+
+with col2:
+    card(title=f"{nulos_longitud}", text="Cantidad de puntos con valores nulos en Longitud", key="nulos_longitud")
+    card(title=f"{ceros_longitud}", text="Cantidad de puntos con valores 0 en Longitud", key="ceros_longitud")
+    card(title=f"{fuera_rango_longitud}", text="Cantidad de puntos fuera de rango en Longitud", key="fuera_rango_longitud")
+    card(title=f"{cantidad_puntos_validos}", text="Cantidad de puntos válidos que se muestran en el mapa", key="puntos_validos")
+
+# Gráfico de pastel para la distribución de centros por entidad administradora
 st.subheader("Distribución de Centros de Vacunación por Entidad Administradora (Top 4 + Otros)")
 
 # Calcular la cantidad de centros por entidad administradora
 entidad_counts = df_filtered['Entidad Administradora'].value_counts()
+
+# Seleccionar los top 4 y agrupar el resto como "Otros"
 top_4_entidades = entidad_counts.nlargest(4)
 otros = entidad_counts[4:].sum()
-entidad_labels = list(top_4_entidades.index) + ['Otros']
+entidad_labels = list(top_4_entidades.index) + ['OTROS']
 entidad_sizes = list(top_4_entidades.values) + [otros]
 
 # Crear el gráfico de pastel
-fig, ax = plt.subplots()
-ax.pie(entidad_sizes, labels=entidad_labels, autopct='%1.1f%%', startangle=90,
-       pctdistance=0.85, labeldistance=1.1, colors=plt.cm.Paired.colors)
-ax.axis('equal')  # Asegura que el gráfico sea circular
-plt.tight_layout()
-st.pyplot(fig)
+fig1 = px.pie(
+    values=entidad_sizes, names=entidad_labels,
+    title='Distribución de Centros de Vacunación por Entidad Administradora (Top 4 + Otros)',
+    category_orders={"Entidad Administradora": entidad_labels[:-1] + ["OTROS"]}
+)
+st.plotly_chart(fig1)
 
-# Gráfico de pastel para la distribución de centros por departamento (Top 5 + Otros)
-st.subheader("Distribución de Centros de Vacunación por Departamento (Top 5 + Otros)")
-
+# Para el gráfico de pie por top departamentos
 centros_vacunacion_porDept = df_filtered[['Departamento', 'ID Centro de Vacunacion']].copy()
-centros_vacunacion_porDept['cant_centros'] = 1
+centros_vacunacion_porDept['Cantidad'] = 1
 centros_vacunacion_porDept = centros_vacunacion_porDept.groupby('Departamento', as_index=False).sum()
-centros_vacunacion_porDept = centros_vacunacion_porDept.sort_values('cant_centros', ascending=False).reset_index(drop=True)
+top5_Dept = centros_vacunacion_porDept.nlargest(5, 'Cantidad')
+otros_dept = pd.DataFrame({'Departamento': ['OTROS'], 'Cantidad': [centros_vacunacion_porDept['Cantidad'][5:].sum()]})
+dept_data = pd.concat([top5_Dept, otros_dept])
 
-top5_Dept_porCantCentros = centros_vacunacion_porDept[:5]
-otros_Dept_porCantCentros = pd.DataFrame(
-    [['OTROS', centros_vacunacion_porDept['cant_centros'][5:].sum()]],
-    columns=['Departamento', 'cant_centros']
+# Gráfico por departamento
+fig2 = px.pie(
+    dept_data, values='Cantidad', names='Departamento',
+    title='Distribución de Centros de Vacunación por Departamento (Top 5 + Otros)',
+    category_orders={"Departamento": list(top5_Dept['Departamento']) + ["OTROS"]}
 )
-centros_vacunacion_porDept_top5_y_otros = pd.concat([top5_Dept_porCantCentros, otros_Dept_porCantCentros])
+st.plotly_chart(fig2)
 
-piec_centros_porDept = px.pie(
-    centros_vacunacion_porDept_top5_y_otros,
-    values='cant_centros', names='Departamento',
-    title='Centros por Departamento',
-    category_orders={"Departamento": ["OTROS"] + list(top5_Dept_porCantCentros['Departamento'][::-1])}
+# Selector para detalles por provincia
+departamentos_opciones = sorted(df_filtered['Departamento'].unique())
+departamento_seleccionado = st.selectbox('Seleccione un Departamento para ver detalles por Provincia', departamentos_opciones)
+
+# Filtrar y graficar por provincia en el departamento seleccionado
+centros_por_provincia = df_filtered[df_filtered['Departamento'] == departamento_seleccionado]
+provincia_counts = centros_por_provincia['Provincia'].value_counts().reset_index()
+provincia_counts.columns = ['Provincia', 'Cantidad']
+top5_Prov = provincia_counts.nlargest(5, 'Cantidad')
+otros_prov = pd.DataFrame({'Provincia': ['OTRAS'], 'Cantidad': [provincia_counts['Cantidad'][5:].sum()]})
+prov_data = pd.concat([top5_Prov, otros_prov])
+
+# Gráfico por provincia
+fig3 = px.pie(
+    prov_data, values='Cantidad', names='Provincia',
+    title=f'Centros de Vacunación en {departamento_seleccionado} por Provincia (Top 5 + Otras)',
+    category_orders={"Provincia": list(top5_Prov['Provincia']) + ["OTRAS"]}
 )
-st.plotly_chart(piec_centros_porDept)
-
-# Selección de Departamento y gráfico de centros por provincia
-st.subheader("Distribución de Centros de Vacunación por Provincia en Departamento Seleccionado")
-
-departamentos_opciones = df_filtered['Departamento'].unique()
-departamento_seleccionado = st.selectbox('Elija el departamento del cual desee mayor detalle', departamentos_opciones)
-
-centros_por_provincia = df_filtered[df_filtered['Departamento'] == departamento_seleccionado][['Provincia', 'ID Centro de Vacunacion']].copy()
-centros_por_provincia['cant_centros'] = 1
-centros_por_provincia = centros_por_provincia.groupby('Provincia', as_index=False).sum()
-centros_por_provincia = centros_por_provincia.sort_values('cant_centros', ascending=False).reset_index(drop=True)
-
-top5_Prov_porCantCentros = centros_por_provincia[:5]
-otras_Prov_porCantCentros = pd.DataFrame(
-    [['OTRAS', centros_por_provincia['cant_centros'][5:].sum()]],
-    columns=['Provincia', 'cant_centros']
-)
-centros_vacunacion_porProv_top5_y_otras = pd.concat([top5_Prov_porCantCentros, otras_Prov_porCantCentros])
-
-piec_centros_porProv = px.pie(
-    centros_vacunacion_porProv_top5_y_otras,
-    values='cant_centros', names='Provincia',
-    title='Centros por Provincia',
-    category_orders={"Provincia": ["OTRAS"] + list(top5_Prov_porCantCentros['Provincia'][::-1])}
-)
-st.plotly_chart(piec_centros_porProv)
+st.plotly_chart(fig3)
