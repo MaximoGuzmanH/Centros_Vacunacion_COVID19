@@ -150,3 +150,32 @@ fig3 = px.pie(
     category_orders={"Provincia": list(top5_Prov['Provincia']) + (["OTRAS"] if otros_prov_count > 0 else [])}
 )
 st.plotly_chart(fig3)
+
+# --- Mapa y tabla filtrada por Departamento, Provincia y Distrito ---
+st.subheader("Filtrar Centros de Vacunación por Ubicación")
+
+# Selector para Departamento
+departamentos = sorted(df_filtered['Departamento'].unique())
+departamento_seleccionado_mapa = st.selectbox("Seleccione un Departamento", options=departamentos, key="dep_map")
+
+# Filtrar opciones de Provincia en base al Departamento seleccionado
+provincias = sorted(df_filtered[df_filtered['Departamento'] == departamento_seleccionado_mapa]['Provincia'].unique())
+provincia_seleccionada_mapa = st.selectbox("Seleccione una Provincia", options=provincias, key="prov_map")
+
+# Filtrar opciones de Distrito en base a la Provincia seleccionada
+distritos = sorted(df_filtered[(df_filtered['Departamento'] == departamento_seleccionado_mapa) & 
+                               (df_filtered['Provincia'] == provincia_seleccionada_mapa)]['Distrito'].unique())
+distrito_seleccionado_mapa = st.selectbox("Seleccione un Distrito", options=distritos, key="dist_map")
+
+# Filtrar el DataFrame según las selecciones
+df_filtrado_ubicacion = df_filtered[(df_filtered['Departamento'] == departamento_seleccionado_mapa) & 
+                                    (df_filtered['Provincia'] == provincia_seleccionada_mapa) & 
+                                    (df_filtered['Distrito'] == distrito_seleccionado_mapa)]
+
+# Mostrar el mapa con los datos filtrados
+st.subheader("Mapa de Centros de Vacunación Filtrados por Ubicación")
+st.map(df_filtrado_ubicacion[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
+
+# Mostrar la tabla de datos filtrados con las mismas columnas que la primera tabla
+st.subheader("Datos Filtrados por Ubicación")
+st.dataframe(df_filtrado_ubicacion.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
