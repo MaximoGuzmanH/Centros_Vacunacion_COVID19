@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from streamlit_card import card
+import folium
+from streamlit_folium import folium_static
 
 @st.cache_resource
 def load_and_process_data(file_path):
@@ -51,26 +53,24 @@ def load_and_process_data(file_path):
             ceros_latitud, ceros_longitud, fuera_rango_latitud, fuera_rango_longitud, cantidad_puntos_validos)
 
 # Definir la ruta del archivo
-file_path = 'data/TB_CENTRO_VACUNACION.csv'
+file_path = './data/TB_CENTRO_VACUNACION.csv'
 
 # Llamar a la función cacheada para cargar y procesar los datos
 (df, df_filtered, total_puntos, nulos_latitud, nulos_longitud, 
  ceros_latitud, ceros_longitud, fuera_rango_latitud, fuera_rango_longitud, cantidad_puntos_validos) = load_and_process_data(file_path)
 
-# Título de la aplicación
+# Mapa general
 st.title('Centros de Vacunacion COVID-19')
 st.subheader("Mapa de Centros de Vacunación")
-
-# Mostrar el mapa usando st.map
 st.map(df_filtered[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
-
-# Mostrar la tabla de datos en Streamlit excluyendo ciertas columnas
 st.dataframe(df_filtered.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
 
 # Mostrar los datos con streamlit_card
 st.subheader("Análisis de Datos")
 
+# Configurar los cards en dos columnas
 col1, col2 = st.columns(2)
+
 with col1:
     card(title=f"{total_puntos}", text="Total de puntos en el DataFrame", key="total_puntos")
     card(title=f"{nulos_latitud}", text="Cantidad de puntos con valores nulos en Latitud", key="nulos_latitud")
@@ -83,99 +83,108 @@ with col2:
     card(title=f"{fuera_rango_longitud}", text="Cantidad de puntos fuera de rango en Longitud", key="fuera_rango_longitud")
     card(title=f"{cantidad_puntos_validos}", text="Cantidad de puntos válidos que se muestran en el mapa", key="puntos_validos")
 
-# Gráfico de pastel para la distribución de centros por entidad administradora
+
+# Gráficos de pastel
 st.subheader("Distribución de Centros de Vacunación por Entidad Administradora (Top 4 + Otros)")
-
-# Calcular la cantidad de centros por entidad administradora
 entidad_counts = df_filtered['Entidad Administradora'].value_counts()
-
-# Seleccionar los top 4 y agrupar el resto como "Otros"
 top_4_entidades = entidad_counts.nlargest(4)
 otros = entidad_counts[4:].sum()
 entidad_labels = list(top_4_entidades.index) + ['OTROS']
 entidad_sizes = list(top_4_entidades.values) + [otros]
-
-# Crear el gráfico de pastel
-fig1 = px.pie(
-    values=entidad_sizes, names=entidad_labels,
-    category_orders={"Entidad Administradora": entidad_labels[:-1] + ["OTROS"]}
-)
+fig1 = px.pie(values=entidad_sizes, names=entidad_labels, 
+              category_orders={"Entidad Administradora": entidad_labels[:-1] + ["OTROS"]})
 st.plotly_chart(fig1)
 
-# Gráfico de pastel para la distribución de centros por departamento (Top 5 + Otros)
 st.subheader("Distribución de Centros de Vacunación por Departamento (Top 5 + Otros)")
-
 centros_vacunacion_porDept = df_filtered[['Departamento', 'ID Centro de Vacunacion']].copy()
 centros_vacunacion_porDept['Cantidad'] = 1
 centros_vacunacion_porDept = centros_vacunacion_porDept.groupby('Departamento', as_index=False).sum()
 top5_Dept = centros_vacunacion_porDept.nlargest(5, 'Cantidad')
 otros_dept_count = centros_vacunacion_porDept['Cantidad'][5:].sum()
-
-# Crear el DataFrame para el gráfico de departamento (condicionalmente agregando "OTROS" si su valor es mayor que 0)
-if otros_dept_count > 0:
-    dept_data = pd.concat([top5_Dept, pd.DataFrame({'Departamento': ['OTROS'], 'Cantidad': [otros_dept_count]})])
-else:
-    dept_data = top5_Dept
-
-# Gráfico por departamento
-fig2 = px.pie(
-    dept_data, values='Cantidad', names='Departamento',
-    category_orders={"Departamento": list(top5_Dept['Departamento']) + (["OTROS"] if otros_dept_count > 0 else [])}
-)
+dept_data = pd.concat([top5_Dept, pd.DataFrame({'Departamento': ['OTROS'], 'Cantidad': [otros_dept_count]})]) if otros_dept_count > 0 else top5_Dept
+fig2 = px.pie(dept_data, values='Cantidad', names='Departamento', 
+              category_orders={"Departamento": list(top5_Dept['Departamento']) + (["OTROS"] if otros_dept_count > 0 else [])})
 st.plotly_chart(fig2)
 
 st.subheader("Centros de Vacunación por Provincia (Top 5 + Otras)")
-
-# Selector para detalles por provincia
 departamentos_opciones = sorted(df_filtered['Departamento'].unique())
 departamento_seleccionado = st.selectbox('Seleccione un Departamento para ver detalles por Provincia', departamentos_opciones)
-
-# Filtrar y graficar por provincia en el departamento seleccionado
 centros_por_provincia = df_filtered[df_filtered['Departamento'] == departamento_seleccionado]
 provincia_counts = centros_por_provincia['Provincia'].value_counts().reset_index()
 provincia_counts.columns = ['Provincia', 'Cantidad']
 top5_Prov = provincia_counts.nlargest(5, 'Cantidad')
 otros_prov_count = provincia_counts['Cantidad'][5:].sum()
-
-# Crear el DataFrame para el gráfico de provincia (condicionalmente agregando "OTRAS" si su valor es mayor que 0)
-if otros_prov_count > 0:
-    prov_data = pd.concat([top5_Prov, pd.DataFrame({'Provincia': ['OTRAS'], 'Cantidad': [otros_prov_count]})])
-else:
-    prov_data = top5_Prov
-
-# Gráfico por provincia
-fig3 = px.pie(
-    prov_data, values='Cantidad', names='Provincia',
-    title=f'Centros de Vacunación en {departamento_seleccionado} por Provincia (Top 5 + Otras)',
-    category_orders={"Provincia": list(top5_Prov['Provincia']) + (["OTRAS"] if otros_prov_count > 0 else [])}
-)
+prov_data = pd.concat([top5_Prov, pd.DataFrame({'Provincia': ['OTRAS'], 'Cantidad': [otros_prov_count]})]) if otros_prov_count > 0 else top5_Prov
+fig3 = px.pie(prov_data, values='Cantidad', names='Provincia',
+              title=f'Centros de Vacunación en {departamento_seleccionado} por Provincia (Top 5 + Otras)',
+              category_orders={"Provincia": list(top5_Prov['Provincia']) + (["OTRAS"] if otros_prov_count > 0 else [])})
 st.plotly_chart(fig3)
 
-# --- Mapa y tabla filtrada por Departamento, Provincia y Distrito ---
+# Filtrado por Ubicación con Mapa y Tabla
 st.subheader("Filtrar Centros de Vacunación por Ubicación")
-
-# Selector para Departamento
 departamentos = sorted(df_filtered['Departamento'].unique())
 departamento_seleccionado_mapa = st.selectbox("Seleccione un Departamento", options=departamentos, key="dep_map")
-
-# Filtrar opciones de Provincia en base al Departamento seleccionado
 provincias = sorted(df_filtered[df_filtered['Departamento'] == departamento_seleccionado_mapa]['Provincia'].unique())
 provincia_seleccionada_mapa = st.selectbox("Seleccione una Provincia", options=provincias, key="prov_map")
-
-# Filtrar opciones de Distrito en base a la Provincia seleccionada
 distritos = sorted(df_filtered[(df_filtered['Departamento'] == departamento_seleccionado_mapa) & 
                                (df_filtered['Provincia'] == provincia_seleccionada_mapa)]['Distrito'].unique())
 distrito_seleccionado_mapa = st.selectbox("Seleccione un Distrito", options=distritos, key="dist_map")
 
-# Filtrar el DataFrame según las selecciones
 df_filtrado_ubicacion = df_filtered[(df_filtered['Departamento'] == departamento_seleccionado_mapa) & 
                                     (df_filtered['Provincia'] == provincia_seleccionada_mapa) & 
                                     (df_filtered['Distrito'] == distrito_seleccionado_mapa)]
 
-# Mostrar el mapa con los datos filtrados
-st.subheader("Mapa de Centros de Vacunación Filtrados por Ubicación")
 st.map(df_filtrado_ubicacion[['Latitud', 'Longitud']].rename(columns={'Latitud': 'latitude', 'Longitud': 'longitude'}))
 
 # Mostrar la tabla de datos filtrados con las mismas columnas que la primera tabla
 st.subheader("Datos Filtrados por Ubicación")
 st.dataframe(df_filtrado_ubicacion.drop(columns=['ID Centro de Vacunacion', 'Latitud', 'Longitud', 'id_eess']))
+
+# Choropleth Map para la clasificación por entidad administrativa
+st.subheader('Centros de Vacunación por Entidad Administradora')
+
+# Cargar el archivo GeoJSON de los departamentos de Perú
+json_peru_dept = './data/peru_departamental_simple.geojson'  # Asegúrate de que este archivo esté en el mismo directorio
+map_center = [-12.0464, -77.0428]
+
+# Seleccionar la entidad administrativa para el choropleth
+entidades_opciones = list(entidad_labels) + ['Sin Identificar']
+entidad_seleccionada_choropleth = st.selectbox('Elija la entidad que desee visualizar', entidades_opciones)
+
+# Preparar datos para el choropleth
+centros_vacunacion_porDept_Choropleth = df_filtered.copy()
+centros_vacunacion_porDept_Choropleth['Entidad Administradora'] = centros_vacunacion_porDept_Choropleth['Entidad Administradora'].fillna('Sin Identificar')
+centros_vacunacion_porDept_Choropleth.loc[~centros_vacunacion_porDept_Choropleth['Entidad Administradora'].isin(top_4_entidades.index.tolist() + ['Sin Identificar']), 'Entidad Administradora'] = 'OTROS'
+
+# Filtrar los datos según la entidad seleccionada
+df_choropleth_filtered = centros_vacunacion_porDept_Choropleth[centros_vacunacion_porDept_Choropleth['Entidad Administradora'] == entidad_seleccionada_choropleth]
+df_choropleth_grouped = df_choropleth_filtered.groupby('Departamento').size().reset_index(name='Cantidad')
+
+# Crear el mapa de folium
+mapa_peru_chor = folium.Map(location=map_center, tiles='CartoDB positron', name='Light Map', zoom_start=5)
+
+# Crear el choropleth
+cplth_centros_por_dept = folium.Choropleth(
+    geo_data=json_peru_dept,
+    data=df_choropleth_grouped,
+    columns=['Departamento', 'Cantidad'],
+    key_on='feature.properties.NOMBDEP',
+    fill_color='YlGnBu',
+    fill_opacity=0.7,
+    line_opacity=0.2,
+    legend_name='Cantidad de Centros de Vacunación por Entidad'
+).add_to(mapa_peru_chor)
+
+# Añadir tooltip directamente en el choropleth
+for feature in cplth_centros_por_dept.geojson.data['features']:
+    departamento = feature['properties']['NOMBDEP']
+    cantidad = centros_vacunacion_porDept_Choropleth.get(departamento, 0)
+    
+    # Add tooltip with department and quantity of centers
+    folium.GeoJson(
+        feature,
+        tooltip=folium.Tooltip(f'Departamento: {departamento}<br>Cantidad de Centros: {cantidad}', sticky=True)
+    ).add_to(mapa_peru_chor)
+
+# Mostrar el mapa en Streamlit
+folium_static(mapa_peru_chor)
