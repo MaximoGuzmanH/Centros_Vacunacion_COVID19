@@ -172,7 +172,8 @@ cplth_centros_por_dept = folium.Choropleth(
     fill_color='YlGnBu',
     fill_opacity=0.7,
     line_opacity=0.2,
-    legend_name='Cantidad de Centros de Vacunación por Entidad'
+    legend_name='Cantidad de Centros de Vacunación por Entidad',
+    nan_fill_color = 'white'
 ).add_to(mapa_peru_chor)
 
 # Crear un diccionario para mapear departamento con cantidad
