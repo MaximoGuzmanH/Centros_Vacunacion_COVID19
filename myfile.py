@@ -175,16 +175,20 @@ cplth_centros_por_dept = folium.Choropleth(
     legend_name='Cantidad de Centros de Vacunación por Entidad'
 ).add_to(mapa_peru_chor)
 
-# Añadir tooltip directamente en el choropleth
+# Crear un diccionario para mapear departamento con cantidad
+cantidad_por_departamento = dict(zip(df_choropleth_grouped['Departamento'], df_choropleth_grouped['Cantidad']))
+
+# Añadir tooltip para cada departamento
 for feature in cplth_centros_por_dept.geojson.data['features']:
     departamento = feature['properties']['NOMBDEP']
-    cantidad = centros_vacunacion_porDept_Choropleth.get(departamento, 0)
-    
-    # Add tooltip with department and quantity of centers
-    folium.GeoJson(
-        feature,
-        tooltip=folium.Tooltip(f'Departamento: {departamento}<br>Cantidad de Centros: {cantidad}', sticky=True)
-    ).add_to(mapa_peru_chor)
+    cantidad = cantidad_por_departamento.get(departamento, 0)  # Obtener cantidad de centros
+    feature['properties']['tooltip'] = f'Departamento: {departamento}<br>Cantidad de Centros: {cantidad}'
+
+folium.GeoJsonTooltip(
+    fields=['tooltip'],
+    aliases=[''],
+    sticky=True
+).add_to(cplth_centros_por_dept.geojson)
 
 # Mostrar el mapa en Streamlit
 folium_static(mapa_peru_chor)
